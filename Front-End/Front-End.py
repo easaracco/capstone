@@ -4,15 +4,26 @@ import streamlit as st
 import altair as alt
 from streamlit_option_menu import option_menu
 from PIL import Image
+import streamlit_authenticator as stauth
+from yaml.loader import SafeLoader
+import yaml
+
+api_base_url = "https://api-dot-plucky-pointer-375715.ue.r.appspot.com/"
+
+headers = {"X-API-KEY": "SecretCapstoneKey"}
 
 # Fetch data from API
 def fetch_data(url):
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        return pd.DataFrame(data["result"])
-    else:
-        st.error(f"Error fetching data from {url}: {response.status_code}")
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            return pd.DataFrame(data["result"])
+        else:
+            st.error(f"Error fetching data from {url}: {response.status_code}")
+            return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error fetching data from {url}: {e}")
         return pd.DataFrame()
 
 def plot_revenue_per_day_histogram(df):
@@ -45,7 +56,6 @@ def plot_revenue_per_age_histogram(df):
 
     return chart_perage
 
-
 def plot_revenue_per_product_group_histogram(df):
     # Sort DataFrame by revenue in descending order
     df = df.sort_values('revenue', ascending=False)
@@ -58,10 +68,7 @@ def plot_revenue_per_product_group_histogram(df):
     ).properties(
         title='Total Revenue per Product Group'
     )
-
     return chart
-
-
 # Load data into DataFrames
 articles_url = "https://api-dot-plucky-pointer-375715.ue.r.appspot.com/api/v1/articles"
 customers_url = "https://api-dot-plucky-pointer-375715.ue.r.appspot.com/api/v1/customers"
@@ -101,9 +108,46 @@ total_customers = customers_df['customer_id'].nunique()
 total_transactions = len(transactions_df)
 KPI_saleschannel_df["percentage"] = KPI_saleschannel_df["revenue"] / KPI_saleschannel_df["revenue"].sum() * 100
 
+hashed_passwords = stauth.Hasher(['pythonrocks', 'capstonemore']).generate()
+
+yaml_config = f'''
+credentials:
+  usernames: 
+    pgarcia:
+      email: pepegar@gmail.com
+      name: Pepe Garcia
+      password: {hashed_passwords[0]}
+    gmartin:
+      email: gmartin@gmail.com
+      name: Gustavo Martin
+      password: {hashed_passwords[1]}
+cookie:
+  expiry_days: 30
+  key: keysareimportant
+  name: cookie
+preauthorized:
+  emails:
+  - edgardo.alvarez@student.ie.edu
+'''
+
+config = yaml.load(yaml_config, Loader=yaml.SafeLoader)
+
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days'],
+    config['preauthorized']
+)
+
+name, authentication_status, username = authenticator.login('Login', 'main')
+
+
 Image=Image.open('hmlogo.png')
 
 st.sidebar.image(Image, output_format='PNG', use_column_width=True)
+st.sidebar.subheader(f"Welcome to H&M Dashboard: {name}")
+authenticator.logout("Logout", "sidebar")
 
 with st.sidebar:
     page = option_menu(
@@ -111,110 +155,113 @@ with st.sidebar:
         options =['Home', 'KPI', 'Articles', 'Customers', 'Transactions']
     )
 
-# Home
-if page == 'Home':
-    st.title('H&M Dashboard')
-    st.subheader('Welcome to H&M Dashboard.')
-    st.write('This dashboard is created to help H&M to understand their customers better and to help them to make better decisions.')
-    st.write('1. KPI: This page shows the main table used to calculate the KPIs and 5 different charts disect revenue into different subgroups.')
-    st.write('2. Articles: This page shows the full table of articles from H&M database.')
-    st.write('3. Customers: This page shows the full table of customers from H&M database.')
-    st.write('4. Transactions: This page shows the full table of transactions from H&M database.')
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(label="Total Revenue", value=f"{total_revenue:,.0f} €")
-    with col2:
-        st.metric(label="Total Customers", value=f"{total_customers}")
-    with col3:
-        st.metric(label="Total Transactions", value=f"{total_transactions}")
+if authentication_status==True:
+    # Home
+    if page == 'Home':
+        st.title('H&M Dashboard')
+        st.subheader('Welcome to H&M Dashboard.')
+        st.write('This dashboard is created to help H&M to understand their customers better and to help them to make better decisions.')
+        st.write('1. KPI: This page shows the main table used to calculate the KPIs and 5 different charts disect revenue into different subgroups.')
+        st.write('2. Articles: This page shows the full table of articles from H&M database.')
+        st.write('3. Customers: This page shows the full table of customers from H&M database.')
+        st.write('4. Transactions: This page shows the full table of transactions from H&M database.')
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(label="Total Revenue", value=f"{total_revenue:,.0f} €")
+        with col2:
+            st.metric(label="Total Customers", value=f"{total_customers}")
+        with col3:
+            st.metric(label="Total Transactions", value=f"{total_transactions}")
 
-# KPI
-elif page == 'KPI':
-    st.title('KPI')
+    # KPI
+    elif page == 'KPI':
+        st.title('KPI')
 
-    #defining slider for sales channel
-    saleschannel_lst = KPI_saleschannel_df["sales_channel_id"].to_list()
-    filter_saleschannel = st.sidebar.multiselect(
-        label='Sales Channel',
-        options=saleschannel_lst,
-        default= saleschannel_lst,
-        key='saleschannel')
+        #defining slider for sales channel
+        saleschannel_lst = KPI_saleschannel_df["sales_channel_id"].to_list()
+        filter_saleschannel = st.sidebar.multiselect(
+            label='Sales Channel',
+            options=saleschannel_lst,
+            default= saleschannel_lst,
+            key='saleschannel')
 
-    #defining slider for product group
-    productgroup_lst = KPI_product_group_df["product_group_name"].to_list()
-    filter_productgroup = st.sidebar.multiselect(
-        label='Product Group',
-        options=productgroup_lst,
-        default= productgroup_lst,
-        key='productgroup')
+        #defining slider for product group
+        productgroup_lst = KPI_product_group_df["product_group_name"].to_list()
+        filter_productgroup = st.sidebar.multiselect(
+            label='Product Group',
+            options=productgroup_lst,
+            default= productgroup_lst,
+            key='productgroup')
 
-    #defining slider for age
-    age_min=KPI_age_df["age"].min()
-    age_max=KPI_age_df["age"].max()
-    filter_age = st.sidebar.slider(
-        label='Age',
-        min_value=int(age_min),
-        max_value=int(age_max),
-        value=(int(age_min), int(age_max)),
-        key='age'
-    )
+        #defining slider for age
+        age_min=KPI_age_df["age"].min()
+        age_max=KPI_age_df["age"].max()
+        filter_age = st.sidebar.slider(
+            label='Age',
+            min_value=int(age_min),
+            max_value=int(age_max),
+            value=(int(age_min), int(age_max)),
+            key='age'
+        )
 
-    #defining slider for day
-    days_lst = KPI_date_df["date"].to_list()
-    filter_date = st.sidebar.multiselect(
-        label='days',
-        options=days_lst,
-        default= daysordered,
-        key='days')
+        #defining slider for day
+        days_lst = KPI_date_df["date"].to_list()
+        filter_date = st.sidebar.multiselect(
+            label='days',
+            options=days_lst,
+            default= daysordered,
+            key='days')
 
-    filter_age_df=KPI_age_df[(KPI_age_df["age"]>=filter_age[0]) & (KPI_age_df["age"]<=filter_age[1])]
-    filter_date_df=KPI_date_df[KPI_date_df["date"].isin(filter_date)]
-    filter_productgroup_df=KPI_product_group_df[KPI_product_group_df["product_group_name"].isin(filter_productgroup)]
-    filter_saleschannel_df=KPI_saleschannel_df[KPI_saleschannel_df["sales_channel_id"].isin(filter_saleschannel)]
+        filter_age_df=KPI_age_df[(KPI_age_df["age"]>=filter_age[0]) & (KPI_age_df["age"]<=filter_age[1])]
+        filter_date_df=KPI_date_df[KPI_date_df["date"].isin(filter_date)]
+        filter_productgroup_df=KPI_product_group_df[KPI_product_group_df["product_group_name"].isin(filter_productgroup)]
+        filter_saleschannel_df=KPI_saleschannel_df[KPI_saleschannel_df["sales_channel_id"].isin(filter_saleschannel)]
 
-    # Show the table
-    st.subheader('KPI Table')
-    st.write(KPI_df)
+        # Show the table
+        st.subheader('KPI Table')
+        st.write(KPI_df)
 
-    # Show the charts
-    st.subheader('KPI Charts')
+        # Show the charts
+        st.subheader('KPI Charts')
 
-    revenue_per_day_histogram = plot_revenue_per_day_histogram(filter_date_df)
-    st.altair_chart(revenue_per_day_histogram, use_container_width=True)
+        revenue_per_day_histogram = plot_revenue_per_day_histogram(filter_date_df)
+        st.altair_chart(revenue_per_day_histogram, use_container_width=True)
 
-    revenue_per_age_histogram = plot_revenue_per_age_histogram(filter_age_df)
-    st.altair_chart(revenue_per_age_histogram, use_container_width=True)
+        revenue_per_age_histogram = plot_revenue_per_age_histogram(filter_age_df)
+        st.altair_chart(revenue_per_age_histogram, use_container_width=True)
 
-    revenue_per_product_group_histogram = plot_revenue_per_product_group_histogram(filter_productgroup_df)
-    st.altair_chart(revenue_per_product_group_histogram, use_container_width=True)
+        revenue_per_product_group_histogram = plot_revenue_per_product_group_histogram(filter_productgroup_df)
+        st.altair_chart(revenue_per_product_group_histogram, use_container_width=True)
 
-    st.table(filter_saleschannel_df[['sales_channel_id', 'percentage']])
+        st.table(filter_saleschannel_df[['sales_channel_id', 'percentage']])
 
-# Articles
-elif page == 'Articles':
-    st.title('Articles')
+    # Articles
+    elif page == 'Articles':
+        st.title('Articles')
 
-    # Show the table
-    st.subheader('Articles Table')
-    st.write(articles_df)
+        # Show the table
+        st.subheader('Articles Table')
+        st.write(articles_df)
 
-# Customers
-elif page == 'Customers':
-    st.title('Customers')
-
-
-    # Show the table
-    st.subheader('Customers Table')
-    st.write(customers_df)
-
-# Transactions
-elif page == 'Transactions':
-    st.title('Transactions')
-
-    # Show the table
-    st.subheader('Transactions Table')
-    st.write(transactions_df)   
+    # Customers
+    elif page == 'Customers':
+        st.title('Customers')
 
 
+        # Show the table
+        st.subheader('Customers Table')
+        st.write(customers_df)
 
+    # Transactions
+    elif page == 'Transactions':
+        st.title('Transactions')
 
+        # Show the table
+        st.subheader('Transactions Table')
+        st.write(transactions_df)   
+
+elif authentication_status== False:
+    st.error('You are not authorized to access this page. Please contact your administrator.')
+
+elif authentication_status == None:
+    st.warning('Please login to access this page.')
