@@ -19,5 +19,5 @@ This project cointains 3 main parts:
     - Deployed in APP Engine (Google Cloud)
     - App Engine does not recognize Streamlit 1.20.0, therefore some changes had to be done to the Front-End when deploying (pie chart was replaced by a table)
 
-    link to frontend: https://frontend-dot-plucky-pointer-375715.ue.r.appspot.com/
-    link to API: https://api-dot-plucky-pointer-375715.ue.r.appspot.com/
+- link to frontend: https://frontend-dot-plucky-pointer-375715.ue.r.appspot.com/
+- link to API: https://api-dot-plucky-pointer-375715.ue.r.appspot.com/
