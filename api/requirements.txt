@@ -1,0 +1,7 @@
+SQLAlchemy==1.4.40
+pandas
+pymysql==1.0.2
+datetime
+flask_restx
+flask
+gunicorn==20.1.0

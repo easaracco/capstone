@@ -1,0 +1,7 @@
+numpy
+pandas
+requests
+streamlit
+altair
+streamlit_option_menu
+pillow
